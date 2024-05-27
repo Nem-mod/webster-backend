@@ -20,10 +20,11 @@ import { RefreshJwtAuthGuard } from './guards/refresh-jwt-auth.guard';
 import { CreateUserDto } from '../user/dto/create-user.dto';
 import { FullUserDto } from '../user/dto/full-user.dto';
 import { UpdateUserDto } from '../user/dto/update-user.dto';
-import { SendLinkDto } from '../mailer/dto/send-link.dto';
 import { ConfigService } from '@nestjs/config';
 import { CredentialsDto } from './dto/credentials.dto';
 import { ReqUser } from './decorators/user.decorator';
+import { BaseMailDto } from '../mailer/interfaces/dto/base.mail.dto';
+import { plainToInstance } from 'class-transformer';
 
 @Controller({
   path: `auth`,
@@ -36,28 +37,24 @@ export class AuthController {
   ) {}
 
   @Post(`register`)
-  async register(
-    @Body() user: CreateUserDto,
-    // @Body(`calendar`) calendar: CreateCalendarDto,@
-  ): Promise<FullUserDto> {
-    return await this.authService.register(user);
+  async register(@Body() user: CreateUserDto): Promise<FullUserDto> {
+    const newUser: FullUserDto = await this.authService.register(user);
+
+    return plainToInstance(FullUserDto, newUser);
   }
 
   @HttpCode(204)
-  @Post(`verify/send-code`)
-  async sendVerify(@Body() linkInfo: SendLinkDto) {
+  @Post(`verify/send`)
+  async sendVerify(@Body() linkInfo: BaseMailDto) {
     await this.authService.sendVerifyEmail(linkInfo);
   }
 
-  @Patch(`verify/validate-code`)
-  async validateVerify(
-    @Request() req: RequestType,
-    @Query(`token`) token: string,
-  ) {
+  @Post(`verify/validate`)
+  async validateVerify(@Query(`token`) token: string) {
     await this.authService.validateVerifyEmail(token);
   }
 
-  @Get(`verify/validate-code`)
+  @Get(`verify/validate`)
   async validateVerifyFromGet(@Query(`token`) token: string) {
     if (this.configService.get(`stage`) !== `develop`)
       throw new ForbiddenException(
@@ -70,17 +67,18 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Post(`login`)
   async login(
+    @Request() req: RequestType,
     @ReqUser() user: FullUserDto,
     @Response({ passthrough: true }) res: ResponseType,
   ): Promise<FullUserDto> {
-    const tokens = await this.authService.login(user);
+    const tokens = await this.authService.login(user._id);
 
+    await this.authService.logout(req.cookies);
     await this.authService.setAuthCookies(res, tokens);
 
-    return user;
+    return plainToInstance(FullUserDto, user);
   }
 
-  @UseGuards(RefreshJwtAuthGuard)
   @HttpCode(204)
   @Post(`logout`)
   async logout(
@@ -88,6 +86,17 @@ export class AuthController {
     @Response({ passthrough: true }) res: ResponseType,
   ): Promise<void> {
     await this.authService.logout(req.cookies);
+    await this.authService.deleteAuthCookie(res);
+  }
+
+  @UseGuards(AccessJwtAuthGuard)
+  @HttpCode(204)
+  @Post(`logout/all`)
+  async fullLogout(
+    @Request() req: RequestType,
+    @Response({ passthrough: true }) res: ResponseType,
+  ): Promise<void> {
+    await this.authService.fullLogout(req.user._id);
     await this.authService.deleteAuthCookie(res);
   }
 
@@ -99,20 +108,14 @@ export class AuthController {
     @Response({ passthrough: true }) res: ResponseType,
   ) {
     await this.authService.logout(req.cookies);
-    const tokens: CredentialsDto = await this.authService.login(req.user);
+    const tokens: CredentialsDto = await this.authService.login(req.user._id);
     await this.authService.setAuthCookies(res, tokens);
-  }
-
-  @UseGuards(AccessJwtAuthGuard)
-  @Get(`user`)
-  async getUser(@Query(`userId`) userId: string): Promise<FullUserDto> {
-    return await this.authService.findUserById(userId);
   }
 
   @UseGuards(AccessJwtAuthGuard)
   @Get(`profile`)
   async getProfile(@ReqUser() user: FullUserDto): Promise<FullUserDto> {
-    return user;
+    return plainToInstance(FullUserDto, user);
   }
 
   @UseGuards(AccessJwtAuthGuard)
@@ -121,7 +124,12 @@ export class AuthController {
     @ReqUser() currentUser: FullUserDto,
     @Body() user: UpdateUserDto,
   ): Promise<FullUserDto> {
-    return await this.authService.editProfile(currentUser, user);
+    const updatedUser: FullUserDto = await this.authService.editProfile(
+      currentUser._id,
+      user,
+    );
+
+    return plainToInstance(FullUserDto, updatedUser);
   }
 
   @UseGuards(AccessJwtAuthGuard)
@@ -130,8 +138,9 @@ export class AuthController {
   async deleteProfile(
     @Request() req: RequestType,
     @Response({ passthrough: true }) res: ResponseType,
-  ) {
-    await this.authService.deleteProfile(req.user._id);
+  ): Promise<void> {
+    await this.authService.fullLogout(req.user._id);
     await this.authService.deleteAuthCookie(res);
+    await this.authService.deleteProfile(req.user._id);
   }
 }

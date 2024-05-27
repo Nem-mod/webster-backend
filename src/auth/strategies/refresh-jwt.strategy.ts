@@ -1,53 +1,33 @@
 import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
-import { ConfigService } from '@nestjs/config';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { UserService } from '../../user/user.service';
-import { Request as RequestType } from 'express';
-import { AuthService } from '../auth.service';
-import { VerifyPayloadDto } from '../dto/verify-payload.dto';
 import { FullUserDto } from '../../user/dto/full-user.dto';
+import { Strategy } from 'passport-cookie';
+import { BaseTokenService } from '../../token/interfaces/base/base.token.service';
+import { IdDto } from '../../token/interfaces/dto/id.dto';
 
 @Injectable()
 export class RefreshJwtStrategy extends PassportStrategy(
   Strategy,
-  `refreshJwt`,
+  `refreshCookies`,
 ) {
   constructor(
-    private readonly configService: ConfigService,
     private readonly userService: UserService,
-    private readonly authService: AuthService,
+    @Inject('refreshService')
+    private readonly userRefreshTokensService: BaseTokenService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromExtractors([
-        RefreshJwtStrategy.extractJwtFromCookies,
-        ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ]),
-      ignoreExpiration: false,
-      secretOrKey: configService.get(`jwt.refresh.secret`),
-      passReqToCallback: true,
+      cookieName: 'refreshToken',
     });
   }
 
-  async validate(
-    req: RequestType,
-    payload: VerifyPayloadDto,
-  ): Promise<FullUserDto> {
-    try {
-      await this.authService.validateRefresh(
-        RefreshJwtStrategy.extractJwtFromCookies(req),
-      );
-      const user = await this.userService.findById(payload.sub);
+  async validate(token: string): Promise<FullUserDto> {
+    const payload: IdDto = (await this.userRefreshTokensService.decode(
+      token,
+    )) as IdDto;
 
-      return user;
-    } catch (err) {
-      throw new UnauthorizedException();
-    }
-  }
+    await this.userRefreshTokensService.verify(token, payload.id);
 
-  private static extractJwtFromCookies(req: RequestType) {
-    const refreshToken = req.cookies.refreshToken;
-
-    return !refreshToken ? null : refreshToken;
+    return await this.userService.findById(payload.id);
   }
 }

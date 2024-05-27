@@ -1,9 +1,10 @@
 import { UpdateUserDto } from './update-user.dto';
 import { PartialType } from '@nestjs/swagger';
-import { Exclude, Expose } from 'class-transformer';
+import { Exclude, Expose, Transform } from 'class-transformer';
 
 export class FullUserDto extends PartialType(UpdateUserDto) {
   @Expose()
+  @Transform(({ value }) => value.toString(), { toPlainOnly: true })
   _id?: string;
 
   @Expose()

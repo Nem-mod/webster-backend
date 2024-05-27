@@ -1,36 +1,35 @@
 import {
-  BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Response as ResponseType } from 'express';
 import { UserService } from '../user/user.service';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { httponlyCookieOptions } from '../config/httponlyCookieOptions';
 import { CredentialsDto } from './dto/credentials.dto';
 import { CreateUserDto } from '../user/dto/create-user.dto';
 import { FullUserDto } from '../user/dto/full-user.dto';
-import { VerifyPayloadDto } from './dto/verify-payload.dto';
 import { UpdateUserDto } from '../user/dto/update-user.dto';
-import { SendLinkDto } from '../mailer/dto/send-link.dto';
 import { LoginDto } from './dto/login.dto';
 import { MailerService } from '../mailer/mailer.service';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { BaseMailDto } from '../mailer/interfaces/dto/base.mail.dto';
+import { UserVerificationMailDto } from '../mailer/interfaces/dto/user-verification/user-verification.mail.dto';
+import { BaseTokenService } from '../token/interfaces/base/base.token.service';
+import { IdDto } from '../token/interfaces/dto/id.dto';
 
 @Injectable()
 export class AuthService {
-  private expiredRefreshTokens: Set<string> = new Set();
-
   constructor(
     private readonly userService: UserService,
     private readonly mailerService: MailerService,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
-    private readonly eventEmitter: EventEmitter2,
+    @Inject('verifyService')
+    private readonly userVerifyTokensService: BaseTokenService,
+    @Inject('accessService')
+    private readonly userAccessTokensService: BaseTokenService,
+    @Inject('refreshService')
+    private readonly userRefreshTokensService: BaseTokenService,
   ) {}
 
   async validateUser(login: LoginDto): Promise<FullUserDto> {
@@ -50,70 +49,62 @@ export class AuthService {
     throw new UnauthorizedException();
   }
 
-  async validateRefresh(tokens: CredentialsDto): Promise<CredentialsDto> {
-    if (this.expiredRefreshTokens.has(tokens.refreshToken))
-      throw new UnauthorizedException(`Refresh token has expired`);
-    return tokens;
-  }
-
   async register(user: CreateUserDto): Promise<FullUserDto> {
-    const newUser: FullUserDto = await this.userService.create(user);
-
-    this.eventEmitter.emit(`user.created`, newUser._id);
-
-    return newUser;
+    return await this.userService.create(user);
   }
 
-  async sendVerifyEmail(linkInfo: SendLinkDto): Promise<void> {
+  async sendVerifyEmail(linkInfo: BaseMailDto): Promise<void> {
     const user: FullUserDto = await this.userService.findByEmail(
       linkInfo.email,
     );
     if (user.verified) throw new ForbiddenException(`User already verified`);
 
-    linkInfo.returnUrl = await this.mailerService.prepareLink(
-      { username: user.username, sub: user._id } as VerifyPayloadDto,
-      linkInfo,
-      this.configService.get(`jwt.verify`),
-      `verifyToken`,
-    );
+    const mailInfo: UserVerificationMailDto = {
+      ...linkInfo,
+      id: user._id,
+    };
 
-    await this.mailerService.sendEmail(
-      user.email,
-      this.configService.get(`api.sendgrid.verify-template`),
-      { link: linkInfo.returnUrl },
-    );
+    await this.mailerService.userEmailVerification(mailInfo);
   }
 
   async validateVerifyEmail(token: string): Promise<void> {
-    const payload: VerifyPayloadDto =
-      await this.mailerService.validateTokenFromEmail(
-        token,
-        this.configService.get(`jwt.verify`),
-      );
+    const payload: IdDto = (await this.userVerifyTokensService.decode(
+      token,
+    )) as IdDto;
+    await this.userVerifyTokensService.verifyAndClear(token, payload.id);
 
-    await this.userService.verify(payload.sub);
+    await this.userService.verify(payload.id);
   }
 
-  async login(user: FullUserDto): Promise<CredentialsDto> {
-    const payload: VerifyPayloadDto = {
-      username: user.username,
-      sub: user._id,
+  async login(id: string): Promise<CredentialsDto> {
+    const payload: IdDto = {
+      id,
     };
 
-    const accessToken = this.jwtService.sign(
+    const accessToken: string = await this.userAccessTokensService.signAndPush(
       payload,
-      this.configService.get(`jwt.access`),
+      payload.id,
     );
-    const refreshToken = this.jwtService.sign(
-      payload,
-      this.configService.get(`jwt.refresh`),
-    );
+    const refreshToken: string =
+      await this.userRefreshTokensService.signAndPush(payload, payload.id);
 
     return { accessToken, refreshToken };
   }
 
   async logout(tokens: CredentialsDto): Promise<void> {
-    this.expiredRefreshTokens.add(tokens.refreshToken);
+    const payload: IdDto = (await this.userVerifyTokensService.decode(
+      tokens.accessToken,
+    )) as IdDto;
+
+    if (!payload) return;
+
+    await this.userAccessTokensService.remove(tokens.accessToken, payload.id);
+    await this.userRefreshTokensService.remove(tokens.refreshToken, payload.id);
+  }
+
+  async fullLogout(id: string): Promise<void> {
+    await this.userAccessTokensService.clear(id);
+    await this.userRefreshTokensService.clear(id);
   }
 
   async setAuthCookies(
@@ -129,19 +120,11 @@ export class AuthService {
     res.clearCookie('accessToken');
   }
 
-  async findUserById(userId: string): Promise<FullUserDto> {
-    return await this.userService.findById(userId);
+  async editProfile(id: string, user: UpdateUserDto): Promise<FullUserDto> {
+    return this.userService.update(id, user);
   }
 
-  async editProfile(
-    currentUser: FullUserDto,
-    user: UpdateUserDto,
-  ): Promise<FullUserDto> {
-    return this.userService.update(currentUser._id, user);
-  }
-
-  async deleteProfile(userId: string): Promise<void> {
-    await this.userService.remove(userId);
-    this.eventEmitter.emit(`user.deleted`, userId);
+  async deleteProfile(id: string): Promise<void> {
+    await this.userService.remove(id);
   }
 }

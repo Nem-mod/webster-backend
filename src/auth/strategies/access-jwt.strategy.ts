@@ -1,39 +1,33 @@
 import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
-import { ConfigService } from '@nestjs/config';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Strategy } from 'passport-cookie';
+import { Inject, Injectable } from '@nestjs/common';
 import { UserService } from '../../user/user.service';
-import { Request as RequestType } from 'express';
-import { VerifyPayloadDto } from '../dto/verify-payload.dto';
 import { FullUserDto } from '../../user/dto/full-user.dto';
+import { BaseTokenService } from '../../token/interfaces/base/base.token.service';
+import { IdDto } from '../../token/interfaces/dto/id.dto';
 
 @Injectable()
-export class AccessJwtStrategy extends PassportStrategy(Strategy, `accessJwt`) {
+export class AccessJwtStrategy extends PassportStrategy(
+  Strategy,
+  `accessCookies`,
+) {
   constructor(
-    private readonly configService: ConfigService,
     private readonly userService: UserService,
+    @Inject('accessService')
+    private readonly userAccessTokensService: BaseTokenService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromExtractors([
-        AccessJwtStrategy.extractJwtFromCookies,
-        ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ]),
-      ignoreExpiration: false,
-      secretOrKey: configService.get(`jwt.access.secret`),
+      cookieName: 'accessToken',
     });
   }
 
-  async validate(payload: VerifyPayloadDto): Promise<FullUserDto> {
-    try {
-      return await this.userService.findById(payload.sub);
-    } catch (err) {
-      throw new UnauthorizedException();
-    }
-  }
+  async validate(token: string): Promise<FullUserDto> {
+    const payload: IdDto = (await this.userAccessTokensService.decode(
+      token,
+    )) as IdDto;
 
-  private static extractJwtFromCookies(req: RequestType) {
-    const accessToken = req.cookies.accessToken;
+    await this.userAccessTokensService.verify(token, payload.id);
 
-    return !accessToken ? null : accessToken;
+    return await this.userService.findById(payload.id);
   }
 }

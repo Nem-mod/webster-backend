@@ -1,45 +1,30 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { JwtService, JwtSignOptions, JwtVerifyOptions } from '@nestjs/jwt';
-import { SendGridService } from '@anchan828/nest-sendgrid';
-import { ConfigService } from '@nestjs/config';
-import { SendLinkDto } from './dto/send-link.dto';
+import { Inject, Injectable } from '@nestjs/common';
+import { UserVerificationMailDto } from './interfaces/dto/user-verification/user-verification.mail.dto';
+import { IBaseMailType } from './interfaces/base.mail-type.interface';
+import { TicketReceiptMailDto } from './interfaces/dto/ticket-receipt/ticket-receipt.mail.dto';
 
 @Injectable()
 export class MailerService {
   constructor(
-    private readonly configService: ConfigService,
-    private readonly jwtService: JwtService,
-    private readonly sendGridService: SendGridService,
+    @Inject('UserVerificationMail')
+    private readonly userVerificationMail: IBaseMailType,
+    @Inject('UserResetPswMail')
+    private readonly userResetPswMail: IBaseMailType,
+    @Inject('TicketReceiptMail')
+    private readonly ticketReceiptMail: IBaseMailType,
   ) {}
 
-  async prepareLink(
-    payload: Object,
-    linkInfo: SendLinkDto,
-    options: JwtSignOptions,
-    replaceWord: string,
-  ): Promise<SendLinkDto[`returnUrl`]> {
-    const token: string = this.jwtService.sign(payload, options);
-    linkInfo.returnUrl = linkInfo.returnUrl.replace(replaceWord, token);
-    return linkInfo.returnUrl;
+  async userEmailVerification(
+    mailInfo: UserVerificationMailDto,
+  ): Promise<void> {
+    await this.userVerificationMail.execute(mailInfo);
   }
 
-  async sendEmail(email: string, templateId: string, data: {}): Promise<void> {
-    await this.sendGridService.send({
-      to: email,
-      from: this.configService.get(`api.sendgrid.sender`),
-      dynamicTemplateData: data,
-      templateId: templateId,
-    });
+  async userResetPsw(mailInfo: UserVerificationMailDto): Promise<void> {
+    await this.userResetPswMail.execute(mailInfo);
   }
 
-  async validateTokenFromEmail(
-    token: string,
-    options: JwtVerifyOptions,
-  ): Promise<any> {
-    try {
-      return this.jwtService.verify(token, options);
-    } catch (err) {
-      throw new BadRequestException(`Token is invalid`);
-    }
+  async ticketReceipt(mailInfo: TicketReceiptMailDto): Promise<void> {
+    await this.ticketReceiptMail.execute(mailInfo);
   }
 }
