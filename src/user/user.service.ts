@@ -75,6 +75,27 @@ export class UserService {
     }
   }
 
+  async updatePassword(id: string, password: string): Promise<FullUserDto> {
+    try {
+      password = bcrypt.hashSync(
+        password,
+        this.configService.get<number>(`crypt.salt`),
+      );
+
+      return await this.userModel.findByIdAndUpdate(
+        id,
+        { password },
+        {
+          new: true,
+          projection: { password: 0 }, // TODO: make password hidden everywhere
+        },
+      );
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  }
+
   async verify(id: string): Promise<void> {
     const user: User = await this.userModel.findByIdAndUpdate(id, {
       verified: true,

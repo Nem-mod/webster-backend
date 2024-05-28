@@ -25,6 +25,7 @@ import { CredentialsDto } from './dto/credentials.dto';
 import { ReqUser } from './decorators/user.decorator';
 import { BaseMailDto } from '../mailer/interfaces/dto/base.mail.dto';
 import { plainToInstance } from 'class-transformer';
+import { CreatePasswordDto } from '../user/dto/create-password.dto';
 
 @Controller({
   path: `auth`,
@@ -62,6 +63,20 @@ export class AuthController {
       );
 
     await this.authService.validateVerifyEmail(token);
+  }
+
+  @HttpCode(204)
+  @Post(`resetpsw/send`)
+  async sendResetPsw(@Body() linkInfo: BaseMailDto) {
+    await this.authService.sendResetPswEmail(linkInfo);
+  }
+
+  @Post(`resetpsw/validate`)
+  async validateResetPsw(
+    @Query(`token`) token: string,
+    @Body() newPassword: CreatePasswordDto,
+  ): Promise<void> {
+    await this.authService.validateResetPsw(token, newPassword.password);
   }
 
   @UseGuards(LocalAuthGuard)

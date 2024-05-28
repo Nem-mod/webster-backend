@@ -30,6 +30,8 @@ export class AuthService {
     private readonly userAccessTokensService: BaseTokenService,
     @Inject('refreshService')
     private readonly userRefreshTokensService: BaseTokenService,
+    @Inject('resetPswService')
+    private readonly userResetPswTokensService: BaseTokenService,
   ) {}
 
   async validateUser(login: LoginDto): Promise<FullUserDto> {
@@ -74,6 +76,30 @@ export class AuthService {
     await this.userVerifyTokensService.verifyAndClear(token, payload.id);
 
     await this.userService.verify(payload.id);
+  }
+
+  async sendResetPswEmail(linkInfo: BaseMailDto): Promise<void> {
+    const user: FullUserDto = await this.userService.findByEmail(
+      linkInfo.email,
+    );
+
+    const mailInfo: UserVerificationMailDto = {
+      ...linkInfo,
+      id: user._id,
+    };
+
+    await this.mailerService.userResetPsw(mailInfo);
+  }
+
+  async validateResetPsw(token: string, newPassword: string): Promise<void> {
+    const payload: IdDto = (await this.userResetPswTokensService.decode(
+      token,
+    )) as IdDto;
+    await this.userResetPswTokensService.verifyAndClear(token, payload.id);
+
+    await this.userService.updatePassword(payload.id, newPassword);
+
+    await this.fullLogout(payload.id);
   }
 
   async login(id: string): Promise<CredentialsDto> {
