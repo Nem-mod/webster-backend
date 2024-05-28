@@ -7,6 +7,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { NestRedisOmModule } from './redis-om/nest.redis-om.module';
 import { TokenModule } from './token/token.module';
 import { AuthModule } from './auth/auth.module';
+import { UploaderModule } from './uploader/uploader.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AuthModule } from './auth/auth.module';
       }),
       inject: [ConfigService],
     }),
+    UploaderModule,
   ],
   controllers: [],
   providers: [],
