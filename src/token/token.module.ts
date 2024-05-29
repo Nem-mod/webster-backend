@@ -16,6 +16,7 @@ import { UserVerifyTokensSchema } from './user/verify/user.verify.tokens.schema'
   imports: [
     JwtModule,
     NestRedisOmModule.forRoot(
+      // TODO: Create forRootAsync and pass url from dotenv!
       [
         UserVerifyTokensSchema,
         UserRefreshTokensSchema,

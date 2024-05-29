@@ -11,12 +11,13 @@ import {
   Patch,
   Query,
   ForbiddenException,
+  HttpStatus,
 } from '@nestjs/common';
 import { Request as RequestType, Response as ResponseType } from 'express';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { AuthService } from './auth.service';
-import { AccessJwtAuthGuard } from './guards/access-jwt-auth.guard';
-import { RefreshJwtAuthGuard } from './guards/refresh-jwt-auth.guard';
+import { AccessAuthGuard } from './guards/access-auth.guard';
+import { RefreshAuthGuard } from './guards/refresh-auth.guard';
 import { CreateUserDto } from '../user/dto/create-user.dto';
 import { FullUserDto } from '../user/dto/full-user.dto';
 import { UpdateUserDto } from '../user/dto/update-user.dto';
@@ -44,7 +45,7 @@ export class AuthController {
     return plainToInstance(FullUserDto, newUser);
   }
 
-  @HttpCode(204)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Post(`verify/send`)
   async sendVerify(@Body() linkInfo: BaseMailDto) {
     await this.authService.sendVerifyEmail(linkInfo);
@@ -65,7 +66,7 @@ export class AuthController {
     await this.authService.validateVerifyEmail(token);
   }
 
-  @HttpCode(204)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Post(`resetpsw/send`)
   async sendResetPsw(@Body() linkInfo: BaseMailDto) {
     await this.authService.sendResetPswEmail(linkInfo);
@@ -94,7 +95,7 @@ export class AuthController {
     return plainToInstance(FullUserDto, user);
   }
 
-  @HttpCode(204)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Post(`logout`)
   async logout(
     @Request() req: RequestType,
@@ -104,8 +105,8 @@ export class AuthController {
     await this.authService.deleteAuthCookie(res);
   }
 
-  @UseGuards(AccessJwtAuthGuard)
-  @HttpCode(204)
+  @UseGuards(AccessAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Post(`logout/all`)
   async fullLogout(
     @Request() req: RequestType,
@@ -115,8 +116,8 @@ export class AuthController {
     await this.authService.deleteAuthCookie(res);
   }
 
-  @UseGuards(RefreshJwtAuthGuard)
-  @HttpCode(204)
+  @UseGuards(RefreshAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Post(`refresh`)
   async refreshTokens(
     @Request() req: RequestType,
@@ -127,13 +128,13 @@ export class AuthController {
     await this.authService.setAuthCookies(res, tokens);
   }
 
-  @UseGuards(AccessJwtAuthGuard)
+  @UseGuards(AccessAuthGuard)
   @Get(`profile`)
   async getProfile(@ReqUser() user: FullUserDto): Promise<FullUserDto> {
     return plainToInstance(FullUserDto, user);
   }
 
-  @UseGuards(AccessJwtAuthGuard)
+  @UseGuards(AccessAuthGuard)
   @Patch(`profile`)
   async editUser(
     @ReqUser() currentUser: FullUserDto,
@@ -147,8 +148,8 @@ export class AuthController {
     return plainToInstance(FullUserDto, updatedUser);
   }
 
-  @UseGuards(AccessJwtAuthGuard)
-  @HttpCode(204)
+  @UseGuards(AccessAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(`profile`)
   async deleteProfile(
     @Request() req: RequestType,
