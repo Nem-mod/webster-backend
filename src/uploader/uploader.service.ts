@@ -24,7 +24,7 @@ export class UploaderService {
     this.bucketName = configService.get('api.gcs.bucket-name');
   }
 
-  async upload(
+  async uploadImage(
     file: Express.Multer.File,
     userId: string,
   ): Promise<FullImageDto> {
@@ -66,5 +66,12 @@ export class UploaderService {
     await image.save();
 
     return image.toObject();
+  }
+
+  async updateTime(imageId: string, userId: string): Promise<void> {
+    await this.imageModel.findByIdAndUpdate(
+      { _id: imageId, user: userId },
+      { updatedAt: new Date() },
+    );
   }
 }
