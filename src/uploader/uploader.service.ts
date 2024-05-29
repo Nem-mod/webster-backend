@@ -74,4 +74,12 @@ export class UploaderService {
       { updatedAt: new Date() },
     );
   }
+
+  async getImagesByUser(userId: string): Promise<FullImageDto[]> {
+    return this.imageModel.find(
+      { user: userId },
+      {},
+      { sort: { updatedAt: -1 } },
+    );
+  }
 }

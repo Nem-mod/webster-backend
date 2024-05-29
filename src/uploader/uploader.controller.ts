@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   FileTypeValidator,
+  Get,
   HttpCode,
   HttpStatus,
   MaxFileSizeValidator,
@@ -79,5 +80,17 @@ export class UploaderController {
     @Param('id') imageId: string,
   ): Promise<void> {
     await this.uploaderService.updateTime(imageId, user._id);
+  }
+
+  @UseGuards(AccessAuthGuard)
+  @Get('url')
+  async getAllUserImages(
+    @ReqUser() user: FullUserDto, // TODO: Maybe add sort parameters + pagination
+  ): Promise<FullImageDto[]> {
+    const images: FullImageDto[] = await this.uploaderService.getImagesByUser(
+      user._id,
+    );
+
+    return plainToInstance(FullImageDto, images);
   }
 }
