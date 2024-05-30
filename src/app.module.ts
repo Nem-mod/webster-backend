@@ -8,6 +8,7 @@ import { NestRedisOmModule } from './redis-om/nest.redis-om.module';
 import { TokenModule } from './token/token.module';
 import { AuthModule } from './auth/auth.module';
 import { UploaderModule } from './uploader/uploader.module';
+import { CanvasModule } from './canvas/canvas.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { UploaderModule } from './uploader/uploader.module';
       inject: [ConfigService],
     }),
     UploaderModule,
+    CanvasModule,
   ],
   controllers: [],
   providers: [],
