@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
@@ -40,6 +41,27 @@ export class CanvasController {
     );
 
     return plainToInstance(FullCanvasDto, newCanvas);
+  }
+
+  @UseGuards(AccessAuthGuard)
+  @Get()
+  @SetMetadata('class_serializer:options', { strategy: 'excludeAll' })
+  async getAllUsersCanvases(
+    @ReqUser() user: FullUserDto,
+  ): Promise<FullCanvasDto[]> {
+    const canvases: FullCanvasDto[] = await this.canvasService.findAllByUser(
+      user._id,
+    );
+
+    return plainToInstance(FullCanvasDto, canvases);
+  }
+
+  @UseGuards(AccessAuthGuard, CanvasOwnerGuard)
+  @Get(':id')
+  async getCanvasById(@Param('id') canvasId: string): Promise<FullCanvasDto> {
+    const canvas: FullCanvasDto = await this.canvasService.findById(canvasId);
+
+    return plainToInstance(FullCanvasDto, canvas);
   }
 
   @UseGuards(AccessAuthGuard, CanvasOwnerGuard)

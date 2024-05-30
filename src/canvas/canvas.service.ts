@@ -35,6 +35,10 @@ export class CanvasService {
     return canvas.toObject();
   }
 
+  async findAllByUser(userId: string): Promise<FullCanvasDto[]> {
+    return this.canvasModel.find({ user: userId });
+  }
+
   async isCanvasOwner(canvasId: string, userId: string): Promise<boolean> {
     const canvas: FullCanvasDto = await this.findById(canvasId);
 
