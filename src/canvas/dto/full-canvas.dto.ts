@@ -13,7 +13,7 @@ export class FullCanvasDto {
   resolution: [number, number];
 
   @Expose()
-  canvas: object;
+  canvas: object[];
 
   @Expose()
   @Transform(({ value }) => value?.toString(), { toPlainOnly: true }) // TODO: what if FullUserDto.toString()?

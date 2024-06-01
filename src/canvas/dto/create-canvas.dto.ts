@@ -5,7 +5,6 @@ import {
   IsDefined,
   IsNotEmpty,
   IsNumber,
-  IsObject,
   IsString,
 } from 'class-validator';
 
@@ -20,7 +19,7 @@ export class CreateCanvasDto {
   @ArrayMaxSize(2)
   resolution: [number, number];
 
-  @IsObject()
+  @IsArray()
   @IsDefined()
-  canvas: object;
+  canvas: object[];
 }
