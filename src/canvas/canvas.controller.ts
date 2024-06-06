@@ -45,7 +45,7 @@ export class CanvasController {
 
   @UseGuards(AccessAuthGuard)
   @Get()
-  @SetMetadata('class_serializer:options', { strategy: 'excludeAll' })
+  // @SetMetadata('class_serializer:options', { strategy: 'excludeAll' })
   async getAllUsersCanvases(
     @ReqUser() user: FullUserDto,
   ): Promise<FullCanvasDto[]> {
