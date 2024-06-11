@@ -7,9 +7,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Image } from './schemas/image.schema';
 import { FullImageDto } from './dto/full-image.dto';
+import { createApi } from 'unsplash-js';
+import nodeFetch from 'node-fetch';
+import { UnsplashImageDto } from './dto/unsplash-image.dto';
 
 @Injectable()
 export class UploaderService {
+  private unsplash;
+
   private storage: Storage;
   private bucketName: string;
 
@@ -17,11 +22,19 @@ export class UploaderService {
     private readonly configService: ConfigService,
     @InjectModel(Image.name) private readonly imageModel: Model<Image>,
   ) {
+    const unsplashAccessKey = this.configService.get<string>(
+      'api.unsplash.access',
+    );
+
     this.storage = new Storage({
       projectId: configService.get('api.gcs.project-id'),
       keyFilename: configService.get('api.gcs.key-file-path'),
     });
     this.bucketName = configService.get('api.gcs.bucket-name');
+    this.unsplash = createApi({
+      accessKey: unsplashAccessKey,
+      fetch: nodeFetch as unknown as typeof fetch,
+    });
   }
 
   async uploadImage(
@@ -81,5 +94,25 @@ export class UploaderService {
       {},
       { sort: { updatedAt: -1 } },
     );
+  }
+
+  async getImagesFromUnsplash(search: string): Promise<UnsplashImageDto[]> {
+    try {
+      const response = await this.unsplash.search.getPhotos({
+        query: search,
+        page: 1,
+        perPage: 20,
+      });
+
+      return response.response.results.map((image): UnsplashImageDto => {
+        return {
+          _id: image.id,
+          url: image.urls.regular,
+        };
+      });
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
   }
 }

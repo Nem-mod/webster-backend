@@ -10,6 +10,7 @@ import {
   ParseFilePipe,
   Patch,
   Post,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -23,6 +24,8 @@ import { ReqUser } from '../auth/decorators/user.decorator';
 import { FullUserDto } from '../user/dto/full-user.dto';
 import { OptionalRefreshJwtAuthGuard } from '../auth/guards/refresh-auth.guard.optional';
 import { AccessAuthGuard } from '../auth/guards/access-auth.guard';
+import { UnsplashImageDto } from './dto/unsplash-image.dto';
+import { SearchUnsplashImageDto } from './dto/search-unsplash-image.dto';
 
 @Controller({
   path: 'uploader',
@@ -92,5 +95,17 @@ export class UploaderController {
     );
 
     return plainToInstance(FullImageDto, images);
+  }
+
+  @UseGuards(AccessAuthGuard)
+  @Get('image')
+  async getImagesFromUnsplash(
+    @Query() query: SearchUnsplashImageDto,
+  ): Promise<UnsplashImageDto[]> {
+    const images = await this.uploaderService.getImagesFromUnsplash(
+      query.search,
+    );
+
+    return plainToInstance(UnsplashImageDto, images);
   }
 }

@@ -4,7 +4,7 @@ import { User } from '../../user/schemas/user.schema';
 
 @Schema({ timestamps: true })
 export class Image extends Document {
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true })
   url: string;
 
   @Prop({ required: true })
